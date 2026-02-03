@@ -1,6 +1,6 @@
 use std::{
 	collections::HashMap,
-	net::{IpAddr, TcpListener},
+	net::TcpListener,
 	ops::Deref,
 	path::{Path, PathBuf},
 	sync::{Arc, RwLock},
@@ -237,13 +237,7 @@ pub fn is_valid_domain(hostname: &str) -> bool {
 }
 
 /// Provision a certificate using ACME (Let's Encrypt)
-pub async fn provision_acme_certificate(
-	hostname: &str,
-	cert_path: &Path,
-	key_path: &Path,
-	max_retries: u32,
-	acme_email: &str,
-) -> Result<()> {
+pub async fn provision_acme_certificate(hostname: &str, cert_path: &Path, key_path: &Path, max_retries: u32) -> Result<()> {
 	if !is_valid_domain(hostname) {
 		return Err(eyre::eyre!("Invalid domain name: {hostname}"));
 	}
@@ -251,7 +245,7 @@ pub async fn provision_acme_certificate(
 	info!("Starting ACME certificate provisioning for domain: {hostname}");
 
 	for attempt in 1..=max_retries {
-		match provision_certificate_attempt(hostname, cert_path, key_path, acme_email).await {
+		match provision_certificate_attempt(hostname, cert_path, key_path).await {
 			Ok(()) => {
 				info!("Successfully provisioned ACME certificate for {hostname}");
 				return Ok(());
@@ -271,27 +265,14 @@ pub async fn provision_acme_certificate(
 	))
 }
 
-async fn provision_certificate_attempt(hostname: &str, cert_path: &Path, key_path: &Path, acme_email: &str) -> Result<()> {
+async fn provision_certificate_attempt(hostname: &str, cert_path: &Path, key_path: &Path) -> Result<()> {
 	info!("Starting ACME certificate provisioning for domain: {}", hostname);
-	let is_ip_addr = hostname.parse::<IpAddr>().is_ok();
-	let contact = if !acme_email.is_empty() {
-		acme_email.to_string()
-	} else if is_ip_addr {
-		let mut hasher = Sha256::new();
-		hasher.update(hostname);
-		let hash = hasher.finalize();
-		let random_str = &hash.iter().map(|b| format!("{:02x}", b)).collect::<String>()[..32];
-		format!("admin@{random_str}.com")
-	} else {
-		format!("admin@{hostname}")
-	};
-	info!("Using {} as ACME account email", contact);
 
 	// Create a new ACME account
 	let (account, _credentials) = Account::builder()?
 		.create(
 			&NewAccount {
-				contact:                 &[&format!("mailto:{contact}")],
+				contact:                 &[&format!("mailto:admin@{hostname}")],
 				terms_of_service_agreed: true,
 				only_return_existing:    false,
 			},
@@ -304,18 +285,9 @@ async fn provision_certificate_attempt(hostname: &str, cert_path: &Path, key_pat
 	info!("Created ACME account successfully");
 
 	// Create the ACME order for the domain
-	let identifiers = if is_ip_addr {
-		vec![Identifier::Ip(hostname.parse::<IpAddr>()?)]
-	} else {
-		vec![Identifier::Dns(hostname.to_string())]
-	};
-	let order_config = if is_ip_addr {
-		NewOrder::new(&identifiers).profile("shortlived")
-	} else {
-		NewOrder::new(&identifiers)
-	};
+	let identifiers = vec![Identifier::Dns(hostname.to_string())];
 	let mut order = account
-		.new_order(&order_config)
+		.new_order(&NewOrder::new(&identifiers))
 		.await
 		.context("Failed to create ACME order")?;
 
@@ -560,7 +532,7 @@ pub async fn is_certificate_expiring(cert_path: &Path, days_threshold: u64) -> R
 }
 
 /// Start the certificate renewal background task
-pub async fn start_certificate_renewal_task(hostname: String, cert_path: PathBuf, key_path: PathBuf, acme_email: String) {
+pub async fn start_certificate_renewal_task(hostname: String, cert_path: PathBuf, key_path: PathBuf) {
 	tokio::spawn(async move {
 		// check cert expiration every 12 hours
 		let mut interval = tokio::time::interval(Duration::from_secs(12 * 60 * 60));
@@ -572,7 +544,7 @@ pub async fn start_certificate_renewal_task(hostname: String, cert_path: PathBuf
 				Ok(true) => {
 					info!("Certificate for {} is expiring soon, attempting renewal", hostname);
 
-					match provision_acme_certificate(&hostname, &cert_path, &key_path, 3, &acme_email).await {
+					match provision_acme_certificate(&hostname, &cert_path, &key_path, 3).await {
 						Ok(()) => {
 							info!("Successfully renewed certificate for {}", hostname);
 						}

@@ -12,7 +12,6 @@ use figment::{
 	providers::{Format, Serialized, Toml, Yaml},
 };
 use figment_json5::Json5;
-use rand::{Rng, distr::Alphanumeric, rng};
 use serde::{Deserialize, Serialize};
 use tracing::{level_filters::LevelFilter, warn};
 use uuid::Uuid;
@@ -150,9 +149,6 @@ pub struct Config {
 	#[serde(default, rename = "hostname")]
 	#[deprecated]
 	pub __hostname:           Option<String>,
-	#[serde(default, rename = "acme_email")]
-	#[deprecated]
-	pub __acme_email:         Option<String>,
 	#[serde(default, rename = "congestion_control")]
 	#[deprecated]
 	pub __congestion_control: Option<CongestionController>,
@@ -203,8 +199,6 @@ pub struct TlsConfig {
 	pub hostname:    String,
 	#[educe(Default(expression = false))]
 	pub auto_ssl:    bool,
-	#[educe(Default(expression = ""))]
-	pub acme_email:  String,
 }
 
 #[derive(Deserialize, Serialize, Educe)]
@@ -332,13 +326,6 @@ pub struct ExperimentalConfig {
 	pub drop_private:  bool,
 }
 
-fn generate_random_alphanumeric_string(min: usize, max: usize) -> String {
-	let mut rng = rng();
-	let len = rng.random_range(min..=max);
-
-	rng.sample_iter(&Alphanumeric).take(len).map(char::from).collect()
-}
-
 impl Config {
 	pub fn migrate(&mut self) {
 		// Migrate TLS-related fields
@@ -358,9 +345,6 @@ impl Config {
 			}
 			if let Some(hostname) = self.__hostname.take() {
 				self.tls.hostname = hostname;
-			}
-			if let Some(acme_email) = self.__acme_email.take() {
-				self.tls.acme_email = acme_email;
 			}
 			if let Some(alpn) = self.__alpn.take() {
 				self.tls.alpn = alpn;
@@ -417,15 +401,10 @@ impl Config {
 		Self {
 			users: {
 				let mut users = HashMap::new();
-				for _ in 0..5 {
-					users.insert(Uuid::new_v4(), generate_random_alphanumeric_string(30, 50));
-				}
+				users.insert(Uuid::new_v4(), "YOUR_USER_PASSWD_HERE".into());
 				users
 			},
-			restful: Some(RestfulConfig {
-				secret: generate_random_alphanumeric_string(30, 50),
-				..Default::default()
-			}),
+			restful: Some(RestfulConfig::default()),
 			// Provide a minimal outbound example
 			outbound: OutboundConfig {
 				default: OutboundRule {
@@ -578,18 +557,9 @@ pub async fn parse_config(cli: Cli, env_state: EnvState) -> eyre::Result<Config>
 	// Handle --init flag
 	if cli.init {
 		warn!("Generating an example configuration to config.toml......");
-
 		let example = Config::full_example();
 		let example = toml::to_string_pretty(&example).unwrap();
-
-		let default_path = std::path::Path::new("config.toml");
-		if tokio::fs::try_exists(default_path).await? {
-			return Err(eyre::eyre!(
-				"config.toml already exists in the current directory, aborting to avoid overwriting."
-			));
-		}
-
-		tokio::fs::write(default_path, example).await?;
+		tokio::fs::write("config.toml", example).await?;
 		return Err(Control("Done").into());
 	}
 
@@ -762,7 +732,6 @@ mod tests {
 		assert!(result.tls.self_sign);
 		assert!(result.tls.auto_ssl);
 		assert_eq!(result.tls.hostname, "testhost");
-		assert_eq!(result.tls.acme_email, "admin@example.com");
 		assert_eq!(result.quic.initial_mtu, 1400);
 		assert_eq!(result.quic.min_mtu, 1300);
 		assert_eq!(result.quic.send_window, 10000000);
@@ -798,6 +767,7 @@ mod tests {
 
 		let uuid = Uuid::parse_str("123e4567-e89b-12d3-a456-426614174002").unwrap();
 		assert_eq!(result.users.get(&uuid), Some(&"old_password".to_string()));
+
 
 		assert!(!result.tls.self_sign);
 		assert!(result.data_dir.ends_with("__test__legacy_data")); // Cleanup test directories

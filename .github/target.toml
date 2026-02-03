@@ -172,23 +172,5 @@ os = "ubuntu-latest"
 target = "loongarch64-unknown-linux-gnu"
 release-name = "loongarch64-linux"
 tool = "cross"
-#skip-test = true
+skip-test = true
 extra-args = "--no-default-features --features ring"
-
-# ==================== MIPS Targets ====================
-
-# MIPS (big-endian) Linux (MUSL - statically linked)
-[[target]]
-target = "mips-unknown-linux-musl"
-tool = "cross"
-extra-args = "--no-default-features --features ring"
-build-std = true
-#skip-test = true
-
-# MIPSEL (little-endian) Linux (MUSL - statically linked)
-[[target]]
-target = "mipsel-unknown-linux-musl"
-tool = "cross"
-extra-args = "--no-default-features --features ring"
-build-std = true
-#skip-test = true

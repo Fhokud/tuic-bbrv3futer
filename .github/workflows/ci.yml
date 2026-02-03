@@ -25,7 +25,7 @@ jobs:
     name: Build
     uses: ./.github/workflows/rust-build.yml
     with:
-      rust-toolchain: "nightly-2025-12-08"
+      rust-toolchain: "nightly-2025-10-05"
       packages: "tuic-server,tuic-client"
       target-config-file: ".github/target.toml"
       rustflags: "-Zthreads=8"
@@ -41,9 +41,6 @@ jobs:
     name: Docker
     needs: [build]
     uses: ./.github/workflows/docker-publish.yml
-    secrets:
-      dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     with:
       docker-file: '.github/Dockerfile'
       image-name: 'tuic-server'

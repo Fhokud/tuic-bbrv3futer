@@ -7,7 +7,7 @@ use std::{
 use eyre::Context;
 use quinn::{
 	Endpoint, EndpointConfig, IdleTimeout, ServerConfig, TokioRuntime, TransportConfig, VarInt,
-	congestion::{BbrConfig, CubicConfig, NewRenoConfig},
+	congestion::{Bbr3Config, CubicConfig, NewRenoConfig},
 	crypto::rustls::QuicServerConfig,
 };
 use rustls::{
@@ -34,7 +34,6 @@ impl Server {
 	pub async fn init(ctx: Arc<AppContext>) -> Result<Self, Error> {
 		let mut crypto: RustlsServerConfig;
 		let hostname = ctx.cfg.tls.hostname.clone();
-		let acme_email = ctx.cfg.tls.acme_email.clone();
 
 		if ctx.cfg.tls.auto_ssl && is_valid_domain(hostname.as_str()) {
 			warn!("Attempting automatic SSL certificate provisioning for domain: {}", hostname);
@@ -52,23 +51,17 @@ impl Server {
 					.with_cert_resolver(cert_resolver);
 
 				// Start certificate renewal background task for existing certificate
-				start_certificate_renewal_task(hostname.clone(), cert_path.clone(), key_path.clone(), acme_email.clone()).await;
+				start_certificate_renewal_task(hostname.clone(), cert_path.clone(), key_path.clone()).await;
 			} else {
 				info!("No valid ACME certificate found, will provision new one");
 
 				// Attempt ACME certificate provisioning
-				match provision_acme_certificate(hostname.as_str(), &cert_path, &key_path, 2, acme_email.as_str()).await {
+				match provision_acme_certificate(hostname.as_str(), &cert_path, &key_path, 2).await {
 					Ok(()) => {
 						warn!("Successfully provisioned ACME certificate for {}", hostname);
 
 						// Start certificate renewal background task
-						start_certificate_renewal_task(
-							hostname.clone(),
-							cert_path.clone(),
-							key_path.clone(),
-							acme_email.clone(),
-						)
-						.await;
+						start_certificate_renewal_task(hostname.clone(), cert_path.clone(), key_path.clone()).await;
 
 						// Use the provisioned certificate
 						let cert_resolver = CertResolver::new(&cert_path, &key_path, Duration::from_secs(30)).await?;
@@ -138,7 +131,7 @@ impl Server {
 
 		match ctx.cfg.quic.congestion_control.controller {
 			CongestionController::Bbr => {
-				let mut bbr_config = BbrConfig::default();
+				let mut bbr_config = Bbr3Config::default();
 				bbr_config.initial_window(ctx.cfg.quic.congestion_control.initial_window);
 				tp_cfg.congestion_controller_factory(Arc::new(bbr_config))
 			}

@@ -13,7 +13,7 @@ Compared to origin, this fork's new features:
 
 **TLS & Security:**
 
-- Automatic SSL/TLS certificate provisioning via ACME (Let's Encrypt) for domain or **IP**
+- Automatic SSL/TLS certificate provisioning via ACME (Let's Encrypt)
 - Self-signed certificate support
 - Certificate auto hot-reload for zero-downtime updates
 - `skip_cert_verify` option for client connections
