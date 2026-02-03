@@ -1,4 +1,54 @@
-- name: Create and publish release
+name: Publish Release
+
+on:
+  workflow_call:
+    inputs:
+      cliff-config:
+        description: 'Path to git-cliff config file'
+        required: false
+        type: string
+        default: '.github/cliff.toml'
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      #--------------------------------------------------
+      # Setup Steps
+      #--------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: "*-binaries"
+          path: ./packages
+          merge-multiple: true
+
+      #--------------------------------------------------
+      # Changelog Generation
+      #--------------------------------------------------
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: ${{ inputs.cliff-config }}
+          args: --latest --strip header
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      #--------------------------------------------------
+      # Release Publishing
+      #--------------------------------------------------
+      - name: Create and publish release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -20,5 +70,5 @@
           # Upload LICENSE file
           gh release upload "$TAG_NAME" LICENSE --clobber
 
-          # Publish the release
+          # Publish the release (change from draft to published)
           gh release edit "$TAG_NAME" --draft=false
