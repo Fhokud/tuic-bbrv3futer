@@ -38,7 +38,7 @@ socks5-server = { version = "0.8", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "std"] }
 
 # QUIC
-quinn = { git = "https://github.com/Tipuch/quinn.git", branch = "bbrv3", default-features = false, features = ["runtime-tokio","log"] }
+quinn = { git = "https://github.com/Tipuch/quinn.git", branch = "bbrv3", default-features = false, features = ["runtime-tokio","qlog"] }
 
 # TUIC
 tuic-core = { path = "../tuic-core", default-features = false, features = ["async_marshal", "marshal", "model"] }
