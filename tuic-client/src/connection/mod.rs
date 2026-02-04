@@ -12,7 +12,7 @@ use once_cell::sync::OnceCell;
 use quinn::{
 	ClientConfig, Connection as QuinnConnection, Endpoint as QuinnEndpoint, EndpointConfig, TokioRuntime, TransportConfig,
 	VarInt, ZeroRttAccepted,
-	congestion::{BbrConfig, CubicConfig, NewRenoConfig},
+	congestion::{Bbr3Config, CubicConfig, NewRenoConfig},
 	crypto::rustls::QuicClientConfig,
 };
 use register_count::Counter;
@@ -171,7 +171,7 @@ impl Connection {
 		match cfg.congestion_control {
 			CongestionControl::Cubic => tp_cfg.congestion_controller_factory(Arc::new(CubicConfig::default())),
 			CongestionControl::NewReno => tp_cfg.congestion_controller_factory(Arc::new(NewRenoConfig::default())),
-			CongestionControl::Bbr => tp_cfg.congestion_controller_factory(Arc::new(BbrConfig::default())),
+			CongestionControl::Bbr => tp_cfg.congestion_controller_factory(Arc::new(Bbr3Config::default())),
 		};
 
 		config.transport_config(Arc::new(tp_cfg));
@@ -179,7 +179,7 @@ impl Connection {
 		// Prepare server address and create the primary endpoint with IPv4 binding
 		let server = ServerAddr::with_sni(cfg.server.0, cfg.server.1, cfg.ip, cfg.ipstack_prefer, cfg.sni);
 		let socket = UdpSocket::bind(SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)))?;
-		let mut ep = QuinnEndpoint::new(EndpointConfig::default(), None, socket, Arc::new(TokioRuntime))?;
+		let ep = QuinnEndpoint::new(EndpointConfig::default(), None, socket, Arc::new(TokioRuntime))?;
 
 		ep.set_default_client_config(config);
 

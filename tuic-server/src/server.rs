@@ -7,7 +7,7 @@ use std::{
 use eyre::Context;
 use quinn::{
 	Endpoint, EndpointConfig, IdleTimeout, ServerConfig, TokioRuntime, TransportConfig, VarInt,
-	congestion::{BbrConfig, CubicConfig, NewRenoConfig},
+	congestion::{Bbr3Config, CubicConfig, NewRenoConfig},
 	crypto::rustls::QuicServerConfig,
 };
 use rustls::{
@@ -138,7 +138,7 @@ impl Server {
 
 		match ctx.cfg.quic.congestion_control.controller {
 			CongestionController::Bbr => {
-				let mut bbr_config = BbrConfig::default();
+				let mut bbr_config = Bbr3Config::default();
 				bbr_config.initial_window(ctx.cfg.quic.congestion_control.initial_window);
 				tp_cfg.congestion_controller_factory(Arc::new(bbr_config))
 			}

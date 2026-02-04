@@ -28,7 +28,7 @@ moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10"
 
 # QUIC
-quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "log"] }
+quinn = { git = "https://github.com/Tipuch/quinn.git", branch = "bbrv3", default-features = false, features = ["runtime-tokio", "qlog"] }
 
 # TUIC
 tuic-core = { path = "../tuic-core", default-features = false, features = ["async_marshal", "marshal", "model"] }
